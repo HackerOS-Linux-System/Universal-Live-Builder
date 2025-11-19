@@ -1,1 +1,231 @@
+= Universal Live Builder (ULB)
 
+:icons: font
+:toc: left
+:toclevels: 3
+:sectnums:
+:sectanchors:
+:source-highlighter: rouge
+
+== Wstęp
+
+Universal Live Builder (ULB) to zaawansowane narzędzie wiersza poleceń napisane w języku Rust, zaprojektowane do łatwego tworzenia niestandardowych dystrybucji Linuxa. ULB umożliwia budowanie obrazów ISO dla zarówno klasycznych, jak i atomowych systemów operacyjnych, opierając się na prostych plikach konfiguracyjnych w formacie TOML. Narzędzie wykorzystuje kontenery (domyślnie Docker, z opcją przełączenia na Podman) do izolowanego procesu budowania, co gwarantuje powtarzalność, bezpieczeństwo i niezależność od środowiska hosta.
+
+ULB jest idealne dla entuzjastów Linuxa, deweloperów, administratorów systemów oraz edukatorów, którzy chcą szybko prototypować własne dystrybucje – od minimalistycznych live CD po pełne, atomowe systemy z niestandardowymi pakietami, plikami i skryptami.
+
+NOTE: ULB jest narzędziem open-source, inspirowanym projektami takimi jak Debian Live Build czy Fedora's Lorax, ale uproszczonym i bardziej elastycznym.
+
+== Główne funkcje
+
+ULB oferuje bogaty zestaw funkcji, które ułatwiają personalizację dystrybucji Linuxa:
+
+- *Budowanie obrazów ISO*: Automatyczne generowanie bootowalnych plików ISO na podstawie profilu konfiguracyjnego.
+- *Wsparcie dla baz dystrybucji*: Ubuntu, Debian, Fedora, openSUSE – z możliwością rozszerzenia w przyszłości.
+- *Klasyczne i atomowe dystrybucje*: Pełna obsługa atomowych systemów (np. opartych na OSTree dla Fedory).
+- *Konfiguracja poprzez TOML*: Łatwe definiowanie pakietów do instalacji/usunięcia, bootloadera, init systemu, wsparcia UEFI/BIOS.
+- *Overlay plików i skrypty*: Kopiowanie niestandardowych plików do rootfs oraz uruchamianie skryptów post-instalacyjnych.
+- *Interaktywny tryb budowania*: Krok po kroku konfiguracja profilu za pomocą pytań w CLI.
+- *Zmiana silnika kontenerów*: Domyślnie Docker, z opcją przełączenia na Podman w ustawieniach.
+- *Logowanie i czyszczenie*: Szczegółowe logi w `/tmp/.ulb/logs/` oraz komenda do usuwania plików tymczasowych.
+- *Poradniki wbudowane*: Wbudowane tutoriale dostępne bezpośrednio w CLI.
+
+TIP: ULB minimalizuje zależności – wystarczy Rust i konteneryzator, aby zacząć budować własną dystrybucję!
+
+== Wymagania systemowe
+
+Aby uruchomić ULB, potrzebujesz:
+
+- *System operacyjny*: Linux (testowany na Ubuntu 22.04+, Fedora 38+, Debian 12+, openSUSE Leap 15+).
+- *Rust i Cargo*: Wersja 1.75+ (zainstaluj via https://rustup.rs/[rustup]).
+- *Konteneryzator*: Docker (domyślny) lub Podman – zainstalowany i skonfigurowany (użytkownik w grupie `docker` lub `podman`).
+- *Uprawnienia*: Root lub sudo do montowania wolumenów w kontenerach (dla chroot i instalacji).
+- *Przestrzeń dyskowa*: Minimum 10 GB wolnego miejsca w `/tmp` na pliki tymczasowe podczas budowania.
+- *Internet*: Do pobierania obrazów bazowych i pakietów (po pierwszym uruchomieniu działa offline, jeśli cache jest obecny).
+
+WARNING: ULB używa uprzywilejowanych kontenerów (`--privileged`) do instalacji bootloadera – upewnij się, że środowisko jest bezpieczne.
+
+== Instalacja
+
+Instalacja ULB jest prosta i zajmuje kilka minut:
+
+. Sklonuj repozytorium:
++
+[source, bash]
+----
+git clone https://github.com/twoje-repo/ulb.git
+cd ulb
+----
+
+. Zbuduj binarny plik wykonywalny:
++
+[source, bash]
+----
+cargo build --release
+----
+
+. (Opcjonalnie) Dodaj do PATH dla globalnego dostępu:
++
+[source, bash]
+----
+sudo cp target/release/ulb /usr/local/bin/
+----
+
+. Sprawdź instalację:
++
+[source, bash]
+----
+ulb --version
+----
++
+Oczekiwany output: `Universal Live Builder 1.0`
+
+NOTE: Jeśli używasz Podman, przełącz w ustawieniach po inicjalizacji projektu.
+
+== Użycie
+
+ULB jest intuicyjne – wszystkie operacje odbywają się za pomocą komend CLI. Uruchom `ulb --help` po więcej szczegółów.
+
+=== Dostępne komendy
+
+Poniższa tabela podsumowuje główne komendy ULB:
+
+[cols="1,3,2", options="header"]
+|===
+| Komenda | Opis | Przykłady użycia
+
+| `init`
+| Inicjuje nowy projekt, tworząc strukturę folderów i przykładowy profil TOML.
+| `ulb init`
+
+| `build [profile]`
+| Buduje dystrybucję na podstawie podanego profilu (nazwa bez .toml; opcjonalna jeśli tylko jeden profil).
+| `ulb build example` lub `ulb build`
+
+| `clean`
+| Czyści pliki tymczasowe w `/tmp/.ulb` (przyspiesza kolejne budowania).
+| `ulb clean`
+
+| `tutorials`
+| Wyświetla wbudowane poradniki i przykłady użycia.
+| `ulb tutorials`
+
+| `settings`
+| Konfiguruje ustawienia, np. zmianę silnika kontenerów (docker/podman).
+| `ulb settings`
+
+| `show-build`
+| Uruchamia interaktywny tryb budowania z pytaniami o konfigurację.
+| `ulb show-build`
+
+|===
+
+=== Struktura projektu
+
+Po uruchomieniu `ulb init`, ULB tworzy następującą strukturę folderów:
+
+----
+moje-distro/
+├── profiles/          # Pliki konfiguracyjne .toml (jeden na dystrybucję)
+├── files/             # Pliki do overlay'u na rootfs (kopiowane do / po instalacji)
+├── scripts/           # Skrypty .sh uruchamiane po instalacji pakietów (w kolejności alfabetycznej)
+├── build/iso/         # Wyjściowe pliki ISO (np. MyDistro-1.0.iso)
+└── .ulb/              # Ukryty folder z konfiguracją ULB (config.toml)
+----
+
+IMPORTANT: Nie modyfikuj folderu `.ulb` ręcznie – używaj `ulb settings`.
+
+=== Przykładowy profil konfiguracyjny
+
+Plik TOML w `profiles/` definiuje całą dystrybucję. Oto przykład `profiles/minimal.toml`:
+
+[source, toml]
+----
+distro_name = "MojaMiniDistro"  # Nazwa dystrybucji
+base = "ubuntu"                 # Baza (ubuntu, debian, fedora, opensuse)
+version = "1.0"                 # Wersja
+format = "iso"                  # Format wyjściowy (tylko iso obsługiwane)
+
+packages = [                    # Pakiety do instalacji
+    "linux-generic",
+    "systemd",
+    "nano",
+    "curl"
+]
+
+packages_to_remove = [          # Pakiety do usunięcia
+    "snapd",
+    "cloud-init"
+]
+
+init_system = "systemd"         # System init (systemd, openrc)
+bootloader = "grub"             # Bootloader (grub, systemd-boot)
+uefi_support = true             # Wsparcie UEFI
+bios_support = true             # Wsparcie BIOS
+atomic = false                  # Czy atomowa dystrybucja (true tylko dla fedora)
+----
+
+=== Przykładowy projekt
+
+Oto kompletny przykład minimalistycznej dystrybucji:
+
+1. Utwórz folder projektu: `mkdir moje-distro && cd moje-distro`
+2. Uruchom `ulb init` – stworzy strukturę.
+3. Edytuj `profiles/minimal.toml` jak powyżej.
+4. Dodaj plik overlay: `mkdir -p files/etc` i utwórz `files/etc/motd` z powitaniem.
+5. Dodaj skrypt: Utwórz `scripts/01-hello.sh` z niestandardową konfiguracją (pamiętaj o `chmod +x`).
+6. Zbuduj: `ulb build minimal`
+7. Wynik: `build/iso/MojaMiniDistro-1.0.iso` – gotowy do nagrania na USB lub testu w VM.
+
+[source, bash]
+----
+# Przykładowy skrypt 01-hello.sh
+#!/bin/bash
+echo "Konfiguruję system..."
+echo "export PS1='\[\\e[32m\]\\u@\\h:\\w\\$ \[\\e[0m\]'" >> /etc/bash.bashrc
+----
+
+Rezultat: Lekka dystrybucja Ubuntu z niestandardowym promptem i powitaniem.
+
+=== Zaawansowane użycie
+
+- *Atomowe dystrybucje*: Ustaw `atomic = true` i `base = "fedora"` – ULB użyje rpm-ostree.
+- *Interaktywny tryb*: `ulb show-build` – odpowiada na pytania, tworzy tymczasowy profil i buduje.
+- *Zmiana kontenera*: W `ulb settings` przełącz na Podman jeśli Docker jest niedostępny.
+- *Logi*: Sprawdź `/tmp/.ulb/logs/ulb.log` dla szczegółów błędów.
+
+== Konfiguracja
+
+Główny plik konfiguracyjny to `.ulb/config.toml`:
+
+[source, toml]
+----
+container_engine = "docker"  # "docker" lub "podman"
+----
+
+Zmieniaj za pomocą `ulb settings` – narzędzie poprosi o nowy silnik i zapisze zmiany.
+
+== Rozwiązywanie problemów
+
+- *Błąd: Kontener nie znaleziony*: Zainstaluj Docker/Podman i dodaj użytkownika do grupy (`sudo usermod -aG docker $USER`).
+- *Błąd budowania*: Sprawdź logi w `/tmp/.ulb/logs/ulb.log`. Upewnij się, że masz połączenie internetowe na pierwsze pobranie obrazów.
+- *Za mała przestrzeń*: Zwiększ `/tmp` lub użyj `ulb clean` przed budowaniem.
+- *Nieobsługiwana baza*: Użyj tylko wspieranych (ubuntu, debian, fedora, opensuse). Zgłoś issue dla nowych.
+- *Błędy w skryptach*: Skrypty muszą być wykonywalne (`chmod +x`) i nie wymagać interakcji.
+
+Jeśli problem persists, otwórz issue na GitHub z logami.
+
+== Kontrybucja
+
+Chcesz pomóc? Witamy!
+
+1. Fork repozytorium.
+2. Utwórz branch: `git checkout -b feature/nowa-funkcja`.
+3. Zcommituj zmiany: `git commit -m "Dodano wsparcie dla Arch"`.
+4. Push: `git push origin feature/nowa-funkcja`.
+5. Otwórz Pull Request.
+
+Zasady: Trzymaj się Rust Code of Conduct. Testuj zmiany przed PR.
+
+== Licencja
+
+ULB jest wydany na licencji MIT. Szczegóły w pliku LICENSE.
