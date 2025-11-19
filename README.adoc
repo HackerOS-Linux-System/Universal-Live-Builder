@@ -73,8 +73,6 @@ sudo chmod a+x /tmp/install.sh
 ----
 ulb --version
 ----
-+
-Oczekiwany output: `Universal Live Builder 0.1.0`
 === Budowanie ze zródeł
 Instalacja ULB jest prosta i zajmuje kilka minut:
 
