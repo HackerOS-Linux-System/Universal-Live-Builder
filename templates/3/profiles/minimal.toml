@@ -1,0 +1,29 @@
+distro_name = "MojaMiniDistro"
+base = "ubuntu"
+version = "1.0"
+format = "iso"
+
+# Pakiety do zainstalowania (bardzo mały zestaw)
+packages = [
+    "linux-generic",
+    "systemd",
+    "nano",
+    "curl",
+    "wget",
+    "bash-completion"
+]
+
+# Usuwamy niepotrzebne rzeczy (zmniejszamy rozmiar)
+packages_to_remove = [
+    "snapd",
+    "cloud-init",
+    "apport",
+    "popularity-contest",
+    "unattended-upgrades"
+]
+
+init_system = "systemd"
+bootloader = "grub"
+uefi_support = true
+bios_support = true
+atomic = false
