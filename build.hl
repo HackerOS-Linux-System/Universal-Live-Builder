@@ -1,3 +1,10 @@
-// make
+// cargo
+// golang
 
-> make
+> cd source-code
+> cd backend
+> cargo build --release
+> cd ..
+> cd fronted
+> go get ulb
+> go build
