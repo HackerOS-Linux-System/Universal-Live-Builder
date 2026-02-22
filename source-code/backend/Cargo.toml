@@ -1,1 +1,17 @@
+[package]
+name = "ulb-backend"
+version = "0.2.0"
+edition = "2021"
 
+[dependencies]
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+scopeguard = "1.2"
+serde_json = "1.0"
+std::sync = "*"  # For Arc/Mutex if needed, but basic
+
+# For future: Add podman crate if exists, but for now use Command
